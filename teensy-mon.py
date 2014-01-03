@@ -43,6 +43,8 @@ class OutputWriter(object):
 
     def __init__(self):
         self.buffered_output = ""
+        self.column = 0
+        self.colored = False
 
     def write(self, string):
         """Writes characters to output. Lines will be delimited by
@@ -57,18 +59,29 @@ class OutputWriter(object):
             self.buffered_output = ""
         while True:
             nl_index = string.find('\n')
-            if nl_index < 0:
+            if self.column == 0 and nl_index < 0 and len(string) < 2:
                 self.buffered_output = string
                 return
 
-            line_string = string[0:nl_index + 1]
+            if nl_index < 0:
+                line_string = string
+            else:
+                line_string = string[0:nl_index + 1]
             prefix = ""
             suffix = ""
-            if len(string) > 2 and string[1] == ':' and string[0] in COLORS:
+            if (self.column == 0 and len(string) >= 2 and
+                    string[1] == ':' and string[0] in COLORS):
                 prefix = COLORS[string[0]]
+                self.colored = True
+            if nl_index >= 0 and self.colored:
                 suffix = NO_COLOR
             sys.stdout.write(prefix + line_string + suffix)
+            sys.stdout.flush()
+            self.column += len(line_string)
+            if nl_index < 0:
+                return
             string = string[nl_index + 1:]
+            self.column = 0
 
 
 def is_teensy(device, serial_num=None):
@@ -139,9 +152,13 @@ def teensy_mon(monitor, device):
                     print 'Teensy device @', port_name, ' disconnected.'
                     serial_port.close()
                     return
+                #for x in data:
+                #    print "Serial.Read '%c' 0x%02x" % (x, ord(x))
                 output.write(data)
             if fileno == sys.stdin.fileno():
                 data = sys.stdin.read(1)
+                #for x in data:
+                #    print "stdin.Read '%c' 0x%02x" % (x, ord(x))
                 serial_port.write(data)
 
 
