@@ -159,7 +159,10 @@ def teensy_mon(monitor, device):
                 data = sys.stdin.read(1)
                 #for x in data:
                 #    print "stdin.Read '%c' 0x%02x" % (x, ord(x))
-                serial_port.write(data)
+                if data[0] == '\n':
+                    serial_port.write('\r')
+                else:
+                    serial_port.write(data)
 
 
 def main():
