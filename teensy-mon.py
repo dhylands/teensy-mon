@@ -143,6 +143,7 @@ def teensy_mon(monitor, device):
                         dev.action != 'remove'):
                     continue
                 print 'Teensy device @', port_name, ' disconnected.'
+                print
                 serial_port.close()
                 return
             if fileno == serial_port.fileno():
@@ -150,11 +151,17 @@ def teensy_mon(monitor, device):
                     data = serial_port.read(256)
                 except serial.serialutil.SerialException:
                     print 'Teensy device @', port_name, ' disconnected.'
+                    print
                     serial_port.close()
                     return
                 #for x in data:
                 #    print "Serial.Read '%c' 0x%02x" % (x, ord(x))
-                output.write(data)
+                # For now, we'll not support color, and let the target do it.
+                # That also means that we work better if the target is doing
+                # something like readline
+                #output.write(data)
+                sys.stdout.write(data)
+                sys.stdout.flush()
             if fileno == sys.stdin.fileno():
                 data = sys.stdin.read(1)
                 #for x in data:
