@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python -u
 
 """Program for monitoring serial messages from the Teensy.
 
@@ -15,6 +15,7 @@ import select
 import pyudev
 import serial
 import sys
+import tty
 import termios
 import traceback
 import syslog
@@ -112,7 +113,7 @@ def teensy_mon(monitor, device):
     """
     port_name = device.device_node
     serial_num = device['ID_SERIAL_SHORT']
-    print 'Teensy device connected @%s (serial %s)' % (port_name, serial_num)
+    print 'Teensy device connected @%s (serial %s)\r' % (port_name, serial_num)
     epoll = select.epoll()
     epoll.register(monitor.fileno(), select.POLLIN)
 
@@ -131,6 +132,13 @@ def teensy_mon(monitor, device):
         print "Unable to open port '%s'" % port_name
         return
 
+    serial_fd = serial_port.fileno()
+    tty.setraw(serial_fd)
+    new_settings = termios.tcgetattr(serial_fd)
+    new_settings[6][termios.VTIME] = 0
+    new_settings[6][termios.VMIN] = 1
+    termios.tcsetattr(serial_fd, termios.TCSANOW, new_settings)
+
     epoll.register(serial_port.fileno(), select.POLLIN)
     epoll.register(sys.stdin.fileno(), select.POLLIN)
 
@@ -142,7 +150,7 @@ def teensy_mon(monitor, device):
                 if (dev.device_node != port_name or
                         dev.action != 'remove'):
                     continue
-                print 'Teensy device @', port_name, ' disconnected.'
+                print 'Teensy device @', port_name, ' disconnected.\r'
                 print
                 serial_port.close()
                 return
@@ -150,7 +158,7 @@ def teensy_mon(monitor, device):
                 try:
                     data = serial_port.read(256)
                 except serial.serialutil.SerialException:
-                    print 'Teensy device @', port_name, ' disconnected.'
+                    print 'Teensy device @', port_name, ' disconnected.\r'
                     print
                     serial_port.close()
                     return
@@ -166,11 +174,12 @@ def teensy_mon(monitor, device):
                 data = sys.stdin.read(1)
                 #for x in data:
                 #    print "stdin.Read '%c' 0x%02x" % (x, ord(x))
+                if data[0] == chr(3):
+                    raise KeyboardInterrupt
                 if data[0] == '\n':
                     serial_port.write('\r')
                 else:
                     serial_port.write(data)
-
 
 def main():
     """The main program."""
@@ -224,6 +233,7 @@ def main():
         # Make some changes to stdin. We want to turn off canonical
         # processing  (so that ^H gets sent to the teensy), turn off echo,
         # and make it unbuffered.
+        tty.setraw(stdin_fd)
         new_settings = termios.tcgetattr(stdin_fd)
         new_settings[3] &= ~(termios.ICANON | termios.ECHO)
         new_settings[6][termios.VTIME] = 0
@@ -251,7 +261,7 @@ def main():
                 if is_teensy(device, args.serial):
                     teensy_mon(monitor, device)
     except KeyboardInterrupt:
-        pass
+        print '\r\n'
     except Exception:
         traceback.print_exc()
     # Restore stdin back to its old settings
